@@ -1,3 +1,4 @@
+// kernel/proc.c
 #include "types.h"
 #include "param.h"
 #include "memlayout.h"
@@ -5,6 +6,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "pstat.h"   // HW2: struct rusage { uint cputime; }
 
 struct cpu cpus[NCPU];
 
@@ -140,6 +142,9 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
+
+  // HW2 Task 2: initialize per-process CPU time counter
+  p->cputime = 0;
 
   return p;
 }
@@ -424,6 +429,66 @@ wait(uint64 addr)
     
     // Wait for a child to exit.
     sleep(p, &wait_lock);  //DOC: wait-sleep
+  }
+}
+
+
+int
+wait2(uint64 addr, uint64 rusage_addr)
+{
+  struct proc *np;
+  int havekids, pid;
+  struct proc *p = myproc();
+  struct rusage ru;
+
+  acquire(&wait_lock);
+
+  for(;;){
+    havekids = 0;
+
+    for(np = proc; np < &proc[NPROC]; np++){
+      if(np->parent == p){
+        acquire(&np->lock);
+        havekids = 1;
+
+        if(np->state == ZOMBIE){
+          // Found a dead child.
+          pid = np->pid;
+
+
+          if(addr != 0 &&
+             copyout(p->pagetable, addr, (char*)&np->xstate, sizeof(np->xstate)) < 0){
+            release(&np->lock);
+            release(&wait_lock);
+            return -1;
+          }
+
+          ru.cputime = np->cputime;
+          if(rusage_addr != 0 &&
+             copyout(p->pagetable, rusage_addr, (char*)&ru, sizeof(ru)) < 0){
+            release(&np->lock);
+            release(&wait_lock);
+            return -1;
+          }
+
+          freeproc(np);
+          release(&np->lock);
+          release(&wait_lock);
+          return pid;
+        }
+
+        release(&np->lock);
+      }
+    }
+
+    
+    if(!havekids || p->killed){
+      release(&wait_lock);
+      return -1;
+    }
+
+    
+    sleep(p, &wait_lock);
   }
 }
 

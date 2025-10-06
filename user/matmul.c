@@ -1,0 +1,82 @@
+
+#include "kernel/types.h"
+#include "user/user.h"
+
+#define ROWS 1000
+#define COLUMNS 1000
+
+int main(int argc, char **argv) {
+
+  int i, j, k, iterations, ii;
+
+  double a[ROWS][COLUMNS];
+  double b[ROWS][COLUMNS];
+  double c[ROWS][COLUMNS];
+ 
+
+  int start_time = uptime(); 
+
+  iterations = 1;
+  if (argc == 2)
+    iterations = atoi(argv[1]);
+
+  for (ii = 0; ii < iterations; ii++) {
+
+  for (i=0; i<ROWS; i++) {
+    for (j=0; j<COLUMNS; j++) {
+      a[i][j] = 3.0;
+      b[i][j] = 2.0;
+      c[i][j] = 0.0;
+    }
+  }
+
+  if (ROWS<10) 
+  {
+
+    for (i=0; i<ROWS; i++) {
+      for (j=0; j<COLUMNS; j++) {
+        printf("%p ", a[i][j]);
+      }
+      printf("\n");
+    }
+
+    for (i=0; i<ROWS; i++) {
+      for (j=0; j<COLUMNS; j++) {
+        printf("%p ", b[i][j]);
+      }
+      printf("\n");
+    }
+
+    for (i=0; i<ROWS; i++) {
+      for (j=0; j<COLUMNS; j++) {
+        printf("%p ", c[i][j]);
+      }
+      printf("\n");
+    }
+    printf("\n");
+  }
+
+  for (i=0; i<ROWS; i++) {
+    for (j=0; j<COLUMNS; j++) {
+      for (k=0; k<COLUMNS; k++) {
+        c[i][j] += a[i][k]*b[k][j];
+      }
+    }
+  }
+
+  if (ROWS<10)
+  {
+    for (i=0; i<ROWS; i++) {
+      for (j=0; j<COLUMNS; j++) {
+        printf("%p ", c[i][j]);
+      }
+      printf("\n");
+    }
+  }
+  }
+  int end_time = uptime();
+
+  printf("Time: %d ticks\n", end_time - start_time);
+
+  exit(0);
+}
