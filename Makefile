@@ -57,6 +57,8 @@ OBJCOPY = $(TOOLPREFIX)objcopy
 OBJDUMP = $(TOOLPREFIX)objdump
 
 CFLAGS = -Wall -Werror -O -fno-omit-frame-pointer -ggdb
+SCHED_ALGO ?= 0
+CFLAGS += -DSCHED_ALGO=$(SCHED_ALGO)
 CFLAGS += -MD
 CFLAGS += -mcmodel=medany
 CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
@@ -136,6 +138,13 @@ UPROGS=\
 	$U/_pstree\
 	$U/_pstest\
 	$U/_sleep\
+	$U/_prio\
+	$U/_pexec\
+	$U/_task1\
+	$U/_task2\
+	$U/_task4\
+    $U/_free\
+    $U/_memory-user\
 	$U/_matmul\
 
 fs.img: mkfs/mkfs README $(UPROGS)
@@ -174,4 +183,3 @@ qemu: $K/kernel fs.img
 qemu-gdb: $K/kernel .gdbinit fs.img
 	@echo "*** Now run 'gdb' in another window." 1>&2
 	$(QEMU) $(QEMUOPTS) -S $(QEMUGDB)
-

@@ -37,3 +37,6 @@ entry("sbrk");
 entry("sleep");
 entry("uptime");
 entry("getprocs");
+entry("getpriority");
+entry("setpriority");
+entry("freepmem"); #hw4

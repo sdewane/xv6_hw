@@ -41,16 +41,26 @@ sys_wait(void)
 uint64
 sys_sbrk(void)
 {
-  int addr;
   int n;
+  struct proc *p = myproc();
 
-  if(argint(0, &n) < 0)
+  if (argint(0, &n) < 0)
     return -1;
-  addr = myproc()->sz;
-  if(growproc(n) < 0)
-    return -1;
-  return addr;
+
+  uint64 oldsz = p->sz;
+  uint64 newsz = oldsz + n;
+
+  // shrink case
+  if (n < 0) {
+    newsz = uvmdealloc(p->pagetable, newsz, oldsz);
+  }
+
+  // record
+  p->sz = newsz;
+
+  return oldsz;
 }
+
 
 uint64
 sys_sleep(void)
@@ -82,6 +92,30 @@ sys_kill(void)
     return -1;
   return kill(pid);
 }
+//hw3
+
+uint64
+sys_getpriority(void)
+{
+  struct proc *p = myproc();
+  return p->priority;
+}
+
+uint64
+sys_setpriority(void)
+{
+  int prio;
+  if (argint(0, &prio) < 0)
+    return -1;
+  if (prio < 0 || prio > 49)
+    return -1;
+
+  struct proc *p = myproc();
+  acquire(&p->lock);
+  p->priority = prio;
+  release(&p->lock);
+  return 0;
+}
 
 // return how many clock tick interrupts have occurred
 // since start.
@@ -108,3 +142,13 @@ sys_getprocs(void)
   return(procinfo(addr));
 }
 
+//hw4
+extern uint64 
+
+kfreepmem(void);
+
+uint64
+sys_freepmem(void)
+{
+  return kfreepmem();
+}

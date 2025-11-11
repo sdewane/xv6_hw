@@ -3,29 +3,37 @@
 #include "kernel/pstat.h"
 #include "user/user.h"
 
-int main(int argc, char **argv)
+static const char *state2str(int s) {
+  switch (s) {
+    case SLEEPING_C: return "sleeping";
+    case RUNNABLE_C: return "runnable";
+    case RUNNING_C:  return "running ";
+    case ZOMBIE_C:   return "zombie  ";
+    default:         return "unknown ";
+  }
+}
+
+int
+main(int argc, char **argv)
 {
-    struct pstat uproc[NPROC];
-    int nprocs;
-    int i;
-    char *state;
-    static char *states[] = {
-        [SLEEPING] "sleeping",
-        [RUNNABLE] "runnable",
-        [RUNNING] "running ",
-        [ZOMBIE] "zombie  "};
+  struct pstat uproc[NPROC];
+  int nprocs;
 
-    nprocs = getprocs(uproc);
-    if (nprocs < 0)
-        exit(-1);
+  // getprocs expects a user pointer (uint64), so cast the array address
+  nprocs = getprocs(uproc);
+  if (nprocs < 0)
+    exit(-1);
 
-    printf("pid\tstate\t\tsize\tppid\tname\n");
-    for (i = 0; i < nprocs; i++)
-    {
-        state = states[uproc[i].state];
-        printf("%d\t%s\t%l\t%d\t%s\n", uproc[i].pid, state,
-               uproc[i].size, uproc[i].ppid, uproc[i].name);
-    }
+  printf("pid\tstate\t\tsize\tppid\tpriority\tname\n");
+  for (int i = 0; i < nprocs; i++) {
+    printf("%d\t%s\t%lu\t%d\t%d\t\t%s\n",
+           uproc[i].pid,
+           state2str(uproc[i].state),
+           (unsigned long)uproc[i].size,   // size is uint64 -> use %lu
+           uproc[i].ppid,
+           uproc[i].priority,
+           uproc[i].name);
+  }
 
-    exit(0);
+  exit(0);
 }

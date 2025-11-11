@@ -119,6 +119,7 @@ allocproc(void)
 
 found:
   p->pid = allocpid();
+  p->priority = 0;
   p->state = USED;
 
   // Allocate a trapframe page.
@@ -230,7 +231,8 @@ userinit(void)
 
   p = allocproc();
   initproc = p;
-  
+  p->priority = 0;
+
   // allocate one user page and copy init's instructions
   // and data into it.
   uvminit(p->pagetable, initcode, sizeof(initcode));
@@ -303,6 +305,8 @@ fork(void)
   np->cwd = idup(p->cwd);
 
   safestrcpy(np->name, p->name, sizeof(p->name));
+
+  np->priority = p->priority;
 
   pid = np->pid;
 
@@ -440,30 +444,50 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  
   c->proc = 0;
-  for(;;){
-    // Avoid deadlock by ensuring that devices can interrupt.
-    intr_on();
 
+#if SCHED_ALGO == PRIORITY_SCHED
+  for(;;){
+    intr_on();
+    struct proc *best = 0;
+    int bestprio = -1;
+
+    for(p = proc; p < &proc[NPROC]; p++){
+      acquire(&p->lock);
+      if(p->state == RUNNABLE && p->priority > bestprio){
+        if(best) release(&best->lock);
+        best = p;
+        bestprio = p->priority;
+      } else {
+        release(&p->lock);
+      }
+    }
+
+    if(best){
+      best->state = RUNNING;
+      c->proc = best;
+      swtch(&c->context, &best->context);
+      c->proc = 0;
+      release(&best->lock);
+    }
+  }
+#else
+  for(;;){
+    intr_on();
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
         swtch(&c->context, &p->context);
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
         c->proc = 0;
       }
       release(&p->lock);
     }
   }
+#endif
 }
+
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
@@ -667,23 +691,27 @@ procinfo(uint64 addr)
   struct proc *thisproc = myproc();
   struct pstat procinfo;
   int nprocs = 0;
-  for(p = proc; p < &proc[NPROC]; p++){ 
+
+  for(p = proc; p < &proc[NPROC]; p++){
     if(p->state == UNUSED)
       continue;
+
     nprocs++;
-    procinfo.pid = p->pid;
+    procinfo.pid   = p->pid;
     procinfo.state = p->state;
-    procinfo.size = p->sz;
-    if (p->parent)
-      procinfo.ppid = (p->parent)->pid;
-    else
-      procinfo.ppid = 0;
-    for (int i=0; i<16; i++)
+    procinfo.size  = p->sz;
+    procinfo.ppid  = p->parent ? p->parent->pid : 0;
+
+    // copy name[16]
+    for (int i = 0; i < 16; i++) {
       procinfo.name[i] = p->name[i];
-   if (copyout(thisproc->pagetable, addr, (char *)&procinfo, sizeof(procinfo)) < 0)
+    }
+
+    procinfo.priority = p->priority;  // HW3
+
+    if (copyout(thisproc->pagetable, addr, (char *)&procinfo, sizeof(procinfo)) < 0)
       return -1;
     addr += sizeof(procinfo);
   }
   return nprocs;
 }
-

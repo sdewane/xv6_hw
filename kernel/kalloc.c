@@ -21,7 +21,9 @@ struct run {
 struct {
   struct spinlock lock;
   struct run *freelist;
+  uint64 freepages;
 } kmem;
+
 
 void
 kinit()
@@ -51,7 +53,6 @@ kfree(void *pa)
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
-  // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
 
   r = (struct run*)pa;
@@ -59,8 +60,10 @@ kfree(void *pa)
   acquire(&kmem.lock);
   r->next = kmem.freelist;
   kmem.freelist = r;
+  kmem.freepages++;           // increment pages hw4
   release(&kmem.lock);
 }
+
 
 // Allocate one 4096-byte page of physical memory.
 // Returns a pointer that the kernel can use.
@@ -72,11 +75,30 @@ kalloc(void)
 
   acquire(&kmem.lock);
   r = kmem.freelist;
-  if(r)
+  if(r){
     kmem.freelist = r->next;
+    kmem.freepages--;
+  }
   release(&kmem.lock);
 
-  if(r)
-    memset((char*)r, 5, PGSIZE); // fill with junk
+  if(r){
+    memset((char*)r, 5, PGSIZE);
+  } else {
+    // HW4 Task 4: out of mem
+    printf("kalloc: out of memory\n");
+  }
+
   return (void*)r;
+}
+
+
+
+uint64
+kfreepmem(void)
+{
+  uint64 bytes;
+  acquire(&kmem.lock);
+  bytes = kmem.freepages * PGSIZE;
+  release(&kmem.lock);
+  return bytes;
 }
