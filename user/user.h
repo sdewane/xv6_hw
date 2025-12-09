@@ -24,6 +24,11 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 uint64 freepmem (void);
+int sem_init(sem_t *sem, int pshared, int value); //hw5
+int sem_destroy(sem_t *sem); //hw5
+int sem_wait(sem_t *sem); //hw5
+int sem_post(sem_t *sem); //hw5
+
 
 // ulib.c
 int stat(const char*, struct stat*);

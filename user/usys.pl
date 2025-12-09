@@ -39,3 +39,7 @@ entry("uptime");
 entry("freepmem");
 entry("mmap");
 entry("munmap");
+entry("sem_init"); #hw5
+entry("sem_destroy"); #hw5
+entry("sem_wait"); #hw5
+entry("sem_post"); #hw5

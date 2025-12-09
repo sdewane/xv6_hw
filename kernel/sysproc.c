@@ -113,3 +113,107 @@ sys_freepmem(void)
   uint64 pages = kfreepages_count();
   return pages * PGSIZE;
 }
+
+//hw5 task 3
+
+uint64
+sys_sem_init(void)
+{
+  uint64 uaddr;       // user-space address of sem_t
+  int pshared;
+  int value;
+
+  if (argaddr(0, &uaddr) < 0)
+    return -1;
+  if (argint(1, &pshared) < 0)
+    return -1;
+  if (argint(2, &value) < 0)
+    return -1;
+
+  // allocate a semaphore slot in the kernel table
+  int idx = semalloc();
+  if (idx < 0)
+    return -1;
+
+  struct semaphore *s = &semtable.sem[idx];
+  acquire(&s->lock);
+  s->count = value;
+  s->valid = 1;
+  release(&s->lock);
+
+  // write the index back into user memory (the sem_t)
+  sem_t ksem = idx;
+  if (copyout(myproc()->pagetable, uaddr, (char *)&ksem, sizeof(ksem)) < 0) {
+    // if copyout fails, free the slot
+    semdealloc(idx);
+    return -1;
+  }
+
+  return 0;
+}
+
+uint64
+sys_sem_destroy(void)
+{
+  uint64 uaddr;   // user-space address of sem_t
+  sem_t ksem;
+
+  if (argaddr(0, &uaddr) < 0)
+    return -1;
+
+  // read sem index from user memory
+  if (copyin(myproc()->pagetable, (char *)&ksem, uaddr, sizeof(ksem)) < 0)
+    return -1;
+
+  // invalidate this semaphore in the table
+  semdealloc(ksem);
+  return 0;
+}
+
+uint64
+sys_sem_wait(void)
+{
+  uint64 uaddr;
+  sem_t ksem;
+
+  if (argaddr(0, &uaddr) < 0)
+    return -1;
+
+  if (copyin(myproc()->pagetable, (char *)&ksem, uaddr, sizeof(ksem)) < 0)
+    return -1;
+
+  struct semaphore *s = &semtable.sem[ksem];
+
+  acquire(&s->lock);
+  while (s->count == 0) {
+    // sleep while holding s->lock; sleep will release and reaquire it
+    sleep(s, &s->lock);
+  }
+  s->count--;
+  release(&s->lock);
+
+  return 0;
+}
+
+uint64
+sys_sem_post(void)
+{
+  uint64 uaddr;
+  sem_t ksem;
+
+  if (argaddr(0, &uaddr) < 0)
+    return -1;
+
+  if (copyin(myproc()->pagetable, (char *)&ksem, uaddr, sizeof(ksem)) < 0)
+    return -1;
+
+  struct semaphore *s = &semtable.sem[ksem];
+
+  acquire(&s->lock);
+  s->count++;
+  // wake up any sleepers on this semaphore
+  wakeup(s);
+  release(&s->lock);
+
+  return 0;
+}
